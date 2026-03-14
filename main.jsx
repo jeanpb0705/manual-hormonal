@@ -43,37 +43,39 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  if (!apiKey) return "Erro: Chave de API não detectada.";
+  // Pegando a chave da OpenAI agora
+  const openAiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  
+  if (!openAiKey) return "Erro: Chave OpenAI não configurada na Vercel.";
 
-  const finalPrompt = systemInstruction 
-    ? `INSTRUÇÃO: ${systemInstruction}\n\nPERGUNTA: ${prompt}`
-    : prompt;
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openAiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini", // Modelo super eficiente
+        messages: [
+          { role: "system", content: systemInstruction || "Você é um assistente médico especialista em saúde hormonal." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7
+      })
+    });
 
-  // Lista de modelos disponíveis na sua conta (Gemini 3 e 1.5)
-  const models = ["gemini-1.5-flash", "gemini-pro"];
+    const data = await response.json();
 
-  for (const modelName of models) {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: finalPrompt }] }]
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text;
-      }
-    } catch (e) {
-      console.error("Erro na tentativa com:", modelName);
+    if (response.ok) {
+      return data.choices[0].message.content;
+    } else {
+      return `Erro OpenAI (${response.status}): ${data.error?.message || "Falha na requisição"}`;
     }
+  } catch (error) {
+    return "Erro de conexão com os servidores da OpenAI.";
   }
-
-  return "Ainda há um problema de permissão na sua chave do Google. Verifique o console do navegador.";
 }
-
 // --- ESTRUTURA DE DADOS ---
 const modulesData = [
   {
