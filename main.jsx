@@ -46,17 +46,18 @@ async function callGemini(prompt, systemInstruction = "") {
   if (!apiKey) return "Erro: Chave de API não detectada.";
   
   try {
-    // Combinamos a instrução de sistema diretamente no texto para evitar erro de campo
-    const fullPrompt = systemInstruction 
-      ? `Instrução: ${systemInstruction}\n\nPergunta: ${prompt}`
+    // Mesclamos a instrução de sistema no prompt para garantir compatibilidade total
+    const finalPrompt = systemInstruction 
+      ? `INSTRUÇÃO DE SISTEMA: ${systemInstruction}\n\nREQUISITO DO USUÁRIO: ${prompt}`
       : prompt;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    // Mudamos de v1beta para v1 (versão estável)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ 
-          parts: [{ text: fullPrompt }] 
+          parts: [{ text: finalPrompt }] 
         }]
       })
     });
@@ -66,11 +67,14 @@ async function callGemini(prompt, systemInstruction = "") {
       return data.candidates?.[0]?.content?.parts?.[0]?.text;
     } else {
       const errorData = await response.json();
-      console.error("Erro detalhado:", errorData);
-      return `Erro na IA: ${errorData.error?.message || "Falha na comunicação"}`;
+      // Se ainda der erro de "not found", tentamos o fallback automático para v1beta
+      if (response.status === 404) {
+         return "Erro 404: O modelo ainda não propagou. Aguarde 5 min ou verifique se a chave está no projeto correto.";
+      }
+      return `Erro na IA (${response.status}): ${errorData.error?.message || "Falha"}`;
     }
   } catch (error) {
-    return "Erro de conexão com a IA.";
+    return "Erro de conexão. Verifique sua internet.";
   }
 }
 
