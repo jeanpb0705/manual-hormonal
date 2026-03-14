@@ -43,43 +43,32 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  const openAiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  
-  if (!openAiKey) return "Erro: Chave OpenAI não configurada na Vercel.";
+  // Pega a chave que você já tem na Vercel
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!key) return "Erro: Configure VITE_GEMINI_API_KEY na Vercel.";
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Usaremos a URL mais estável que existe
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openAiKey}`
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini", 
-        messages: [
-          { 
-            role: "system", 
-            content: systemInstruction || "Você é um assistente médico especialista em endocrinologia funcional." 
-          },
-          { 
-            role: "user", 
-            content: prompt 
-          }
-        ],
-        temperature: 0.5
+        contents: [{ 
+          parts: [{ text: `${systemInstruction}\n\nAnalise isso: ${prompt}` }] 
+        }]
       })
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      return data.choices[0].message.content;
+      return data.candidates[0].content.parts[0].text;
     } else {
-      // Se der erro aqui, a própria OpenAI vai dizer o porquê (ex: falta de saldo ou chave errada)
-      return `Erro OpenAI: ${data.error?.message || "Erro desconhecido"}`;
+      // Se der erro, ele vai te dizer exatamente o que é (ex: se a chave está errada)
+      return `Erro no Google: ${data.error?.message || "Verifique sua chave"}`;
     }
   } catch (error) {
-    return "Erro de conexão com os servidores da OpenAI.";
+    return "Erro de conexão. Verifique sua internet.";
   }
 }
 // --- ESTRUTURA DE DADOS ---
