@@ -45,37 +45,40 @@ const apiKey = getApiKey();
 async function callGemini(prompt, systemInstruction = "") {
   if (!apiKey) return "Erro: Chave de API não detectada.";
   
-  try {
-    // Mesclamos a instrução de sistema no prompt para garantir compatibilidade total
-    const finalPrompt = systemInstruction 
-      ? `INSTRUÇÃO DE SISTEMA: ${systemInstruction}\n\nREQUISITO DO USUÁRIO: ${prompt}`
-      : prompt;
+  const finalPrompt = systemInstruction 
+    ? `INSTRUÇÃO: ${systemInstruction}\n\nPERGUNTA: ${prompt}`
+    : prompt;
 
-    // Mudamos de v1beta para v1 (versão estável)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ 
-          parts: [{ text: finalPrompt }] 
-        }]
-      })
-    });
+  // Lista de modelos para tentar (do mais novo para o mais compatível)
+  const modelsToTry = [
+    "gemini-1.5-flash",
+    "gemini-pro"
+  ];
 
-    if (response.ok) {
-      const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text;
-    } else {
-      const errorData = await response.json();
-      // Se ainda der erro de "not found", tentamos o fallback automático para v1beta
-      if (response.status === 404) {
-         return "Erro 404: O modelo ainda não propagou. Aguarde 5 min ou verifique se a chave está no projeto correto.";
+  for (const model of modelsToTry) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: finalPrompt }] }]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text;
       }
-      return `Erro na IA (${response.status}): ${errorData.error?.message || "Falha"}`;
+      
+      // Se for erro de chave (400), para de tentar para não bloquear
+      if (response.status === 400) return "Erro: Chave de API inválida ou sem permissão.";
+      
+    } catch (e) {
+      console.error(`Falha no modelo ${model}:`, e);
     }
-  } catch (error) {
-    return "Erro de conexão. Verifique sua internet.";
   }
+
+  return "A IA está instável ou o modelo não foi liberado para sua chave ainda. Tente novamente em alguns minutos.";
 }
 
 // --- ESTRUTURA DE DADOS ---
