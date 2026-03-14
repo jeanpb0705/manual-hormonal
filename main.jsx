@@ -43,22 +43,18 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  if (!apiKey) return "Erro: Chave de API não detectada.";
+  if (!apiKey) return "Erro: Chave de API não encontrada.";
   
   const finalPrompt = systemInstruction 
     ? `INSTRUÇÃO: ${systemInstruction}\n\nPERGUNTA: ${prompt}`
     : prompt;
 
-  // Lista de tentativas: combinando versões de API e nomes de modelos
-  const attempts = [
-    { ver: 'v1', mod: 'gemini-1.5-flash' },
-    { ver: 'v1beta', mod: 'gemini-1.5-flash' },
-    { ver: 'v1', mod: 'gemini-pro' }
-  ];
+  // Tentamos o Gemini 3 Flash (que aparece no seu painel) e o 1.5 como reserva
+  const models = ["gemini-3-flash", "gemini-1.5-flash"];
 
-  for (const attempt of attempts) {
+  for (const modelName of models) {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/${attempt.ver}/models/${attempt.mod}:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,18 +66,12 @@ async function callGemini(prompt, systemInstruction = "") {
         const data = await response.json();
         return data.candidates?.[0]?.content?.parts?.[0]?.text;
       }
-      
-      // Se a chave for inválida (400), paramos logo para não perder tempo
-      if (response.status === 400) {
-        return "Erro 400: Chave de API inválida. Verifique se copiou a chave correta para a Vercel.";
-      }
-
     } catch (e) {
-      console.error(`Falha na tentativa ${attempt.ver}/${attempt.mod}`);
+      console.error("Erro na tentativa:", modelName);
     }
   }
 
-  return "O Google ainda não ativou este modelo para a sua chave. Tente criar uma chave nova em 'Existing Project' ou aguarde 10 minutos.";
+  return "IA em manutenção. Verifique se aceitou os termos no Google AI Studio e fez o Redeploy na Vercel.";
 }
 
 // --- ESTRUTURA DE DADOS ---
