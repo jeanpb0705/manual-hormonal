@@ -43,7 +43,6 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  // Pegando a chave da OpenAI agora
   const openAiKey = import.meta.env.VITE_OPENAI_API_KEY;
   
   if (!openAiKey) return "Erro: Chave OpenAI não configurada na Vercel.";
@@ -56,12 +55,18 @@ async function callGemini(prompt, systemInstruction = "") {
         "Authorization": `Bearer ${openAiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // Modelo super eficiente
+        model: "gpt-4o-mini", 
         messages: [
-          { role: "system", content: systemInstruction || "Você é um assistente médico especialista em saúde hormonal." },
-          { role: "user", content: prompt }
+          { 
+            role: "system", 
+            content: systemInstruction || "Você é um assistente médico especialista em endocrinologia funcional." 
+          },
+          { 
+            role: "user", 
+            content: prompt 
+          }
         ],
-        temperature: 0.7
+        temperature: 0.5
       })
     });
 
@@ -70,7 +75,8 @@ async function callGemini(prompt, systemInstruction = "") {
     if (response.ok) {
       return data.choices[0].message.content;
     } else {
-      return `Erro OpenAI (${response.status}): ${data.error?.message || "Falha na requisição"}`;
+      // Se der erro aqui, a própria OpenAI vai dizer o porquê (ex: falta de saldo ou chave errada)
+      return `Erro OpenAI: ${data.error?.message || "Erro desconhecido"}`;
     }
   } catch (error) {
     return "Erro de conexão com os servidores da OpenAI.";
