@@ -49,15 +49,16 @@ async function callGemini(prompt, systemInstruction = "") {
     ? `INSTRUÇÃO: ${systemInstruction}\n\nPERGUNTA: ${prompt}`
     : prompt;
 
-  // Lista de modelos para tentar (do mais novo para o mais compatível)
-  const modelsToTry = [
-    "gemini-1.5-flash",
-    "gemini-pro"
+  // Lista de tentativas: combinando versões de API e nomes de modelos
+  const attempts = [
+    { ver: 'v1', mod: 'gemini-1.5-flash' },
+    { ver: 'v1beta', mod: 'gemini-1.5-flash' },
+    { ver: 'v1', mod: 'gemini-pro' }
   ];
 
-  for (const model of modelsToTry) {
+  for (const attempt of attempts) {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/${attempt.ver}/models/${attempt.mod}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,15 +71,17 @@ async function callGemini(prompt, systemInstruction = "") {
         return data.candidates?.[0]?.content?.parts?.[0]?.text;
       }
       
-      // Se for erro de chave (400), para de tentar para não bloquear
-      if (response.status === 400) return "Erro: Chave de API inválida ou sem permissão.";
-      
+      // Se a chave for inválida (400), paramos logo para não perder tempo
+      if (response.status === 400) {
+        return "Erro 400: Chave de API inválida. Verifique se copiou a chave correta para a Vercel.";
+      }
+
     } catch (e) {
-      console.error(`Falha no modelo ${model}:`, e);
+      console.error(`Falha na tentativa ${attempt.ver}/${attempt.mod}`);
     }
   }
 
-  return "A IA está instável ou o modelo não foi liberado para sua chave ainda. Tente novamente em alguns minutos.";
+  return "O Google ainda não ativou este modelo para a sua chave. Tente criar uma chave nova em 'Existing Project' ou aguarde 10 minutos.";
 }
 
 // --- ESTRUTURA DE DADOS ---
