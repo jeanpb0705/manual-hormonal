@@ -300,7 +300,7 @@ const LoginScreen = ({ onLogin }) => {
             className={`w-full bg-black/40 border ${error ? 'border-red-500' : 'border-white/10'} rounded-xl px-4 py-3 text-center text-white focus:outline-none focus:border-[#fb336d] transition-all`}
           />
           <button type="submit" className="w-full bg-[#fb336d] py-3 rounded-xl font-bold hover:bg-[#d42a68] transition-all shadow-lg shadow-[#fb336d]/20 flex items-center justify-center gap-2">
-            Aceder ao Manual <Unlock size={18}/>
+            Acessar Manual <Unlock size={18}/>
           </button>
         </form>
         {error && <p className="text-red-500 text-xs mt-4 font-bold animate-pulse">Acesso Negado. Tente novamente.</p>}
