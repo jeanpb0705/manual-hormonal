@@ -43,14 +43,14 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  if (!apiKey) return "Erro: Chave de API não encontrada.";
-  
+  if (!apiKey) return "Erro: Chave de API não detectada.";
+
   const finalPrompt = systemInstruction 
     ? `INSTRUÇÃO: ${systemInstruction}\n\nPERGUNTA: ${prompt}`
     : prompt;
 
-  // Tentamos o Gemini 3 Flash (que aparece no seu painel) e o 1.5 como reserva
-  const models = ["gemini-3-flash", "gemini-1.5-flash"];
+  // Lista de modelos disponíveis na sua conta (Gemini 3 e 1.5)
+  const models = ["gemini-1.5-flash", "gemini-pro"];
 
   for (const modelName of models) {
     try {
@@ -67,11 +67,11 @@ async function callGemini(prompt, systemInstruction = "") {
         return data.candidates?.[0]?.content?.parts?.[0]?.text;
       }
     } catch (e) {
-      console.error("Erro na tentativa:", modelName);
+      console.error("Erro na tentativa com:", modelName);
     }
   }
 
-  return "IA em manutenção. Verifique se aceitou os termos no Google AI Studio e fez o Redeploy na Vercel.";
+  return "Ainda há um problema de permissão na sua chave do Google. Verifique o console do navegador.";
 }
 
 // --- ESTRUTURA DE DADOS ---
