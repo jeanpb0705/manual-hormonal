@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { 
-  ClipboardList, 
+import {
+
+ClipboardList, 
   ListChecks, 
   Network, 
   GitBranch, 
@@ -26,13 +27,19 @@ import {
 const ACCESS_PASSWORD = "SAUDEAVANCADA"; 
 
 // --- CONFIGURAÇÃO API ---
+// Ajuste para compatibilidade com diferentes ambientes de build (Vite/Webpack/Vercel)
 const getApiKey = () => {
   try {
+    // Tenta acessar via import.meta.env (Padrão Vite)
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
       return import.meta.env.VITE_GEMINI_API_KEY;
     }
+    // Tenta acessar via process.env (Padrão Webpack/Node)
+    if (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) {
+      return process.env.VITE_GEMINI_API_KEY;
+    }
   } catch (e) {
-    console.warn("Ambiente não suporta acesso direto a variáveis.");
+    console.warn("Ambiente não suporta acesso direto a variáveis de meta.");
   }
   return ""; 
 };
@@ -42,22 +49,33 @@ const apiKey = getApiKey();
 async function callGemini(prompt, systemInstruction = "") {
   if (!apiKey) return "Erro: Chave de API não detectada. Verifique as Environment Variables na Vercel.";
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
-      })
-    });
+    let delay = 1000;
+    for (let i = 0; i < 5; i++) {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+        })
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (response.ok) {
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text;
+      }
+      
+      if (response.status === 429 || response.status >= 500) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+      } else {
+        break;
+      }
     }
-    return "Erro ao processar resposta da IA.";
+    return null;
   } catch (error) {
-    return "Erro de conexão com a API.";
+    console.error("Gemini API Error:", error);
+    return null;
   }
 }
 
@@ -149,36 +167,45 @@ const GeminiAssistant = ({ type }) => {
     setLoading(true);
     setResult("");
 
-    let prompt = `Analise os seguintes dados clínicos de acordo com a visão funcional e hormonal avançada: "${userInput}". Forneça insights práticos.`;
-    const aiResponse = await callGemini(prompt, "Especialista em Endocrinologia Funcional FSA.");
+    let prompt = "";
+    let system = "És um assistente médico especialista em endocrinologia funcional.";
+
+    if (type.includes('anamnese')) {
+      prompt = `Com base no relato: "${userInput}". Sugere 5 perguntas clínicas profundas. Texto simples, sem markdown.`;
+    } else if (type.includes('exames')) {
+      prompt = `Analisa os valores: "${userInput}". Interpreta com base em SAÚDE FUNCIONAL (valores ótimos). Texto simples.`;
+    } else {
+      prompt = `Sintomas: "${userInput}". Sugere 3 hipóteses e exames. Texto simples.`;
+    }
+
+    const aiResponse = await callGemini(prompt, system);
     if (aiResponse) setResult(aiResponse);
     setLoading(false);
   };
 
   return (
-    <div className="mt-6 p-6 rounded-2xl border-2 border-dashed border-[#fb336d]/30 bg-white/5">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles size={20} className="text-[#fb336d]" />
-        <h4 className="text-sm font-bold text-white tracking-wide">ASSISTENTE CLÍNICO COM IA</h4>
+    <div className="mt-6 p-4 rounded-xl border-2 border-dashed border-[#fb336d]/30 bg-white/5">
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles size={18} className="text-[#fb336d]" />
+        <h4 className="text-sm font-bold text-white">Assistente de Inteligência Artificial</h4>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex gap-2">
         <textarea 
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          placeholder="Descreva sintomas ou resultados de exames para análise..."
-          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#fb336d] h-24 resize-none transition-all"
+          placeholder="Descreva aqui os dados clínicos..."
+          className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#fb336d] h-11 resize-none"
         />
         <button 
           onClick={handleGenerate}
           disabled={loading || !userInput}
-          className="bg-[#fb336d] hover:bg-[#d42a68] py-3 rounded-xl transition-all font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#fb336d]/20"
+          className="bg-[#fb336d] hover:bg-[#d42a68] p-2 rounded-lg transition-all h-11 w-11 flex items-center justify-center shrink-0"
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />} 
-          {loading ? "Analisando..." : "Solicitar Análise Inteligente"}
+          {loading ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
         </button>
       </div>
       {result && (
-        <div className="mt-6 p-5 bg-black/60 rounded-xl text-sm leading-relaxed text-slate-200 border border-white/10 shadow-inner animate-in fade-in slide-in-from-top-2">
+        <div className="mt-4 p-4 bg-black/60 rounded-xl text-sm leading-relaxed text-slate-200 border border-white/10 shadow-inner">
           <div dangerouslySetInnerHTML={{ __html: formatPlainText(result) }} />
         </div>
       )}
@@ -200,28 +227,28 @@ const InteractiveQuestionnaire = () => {
 
   const handleAnalyze = async () => {
     setLoading(true);
-    const prompt = `Analise os seguintes sintomas marcados pelo paciente: ${selectedSymptoms.join(", ")}. Identifique possíveis eixos comprometidos e sugira exames.`;
-    const aiResponse = await callGemini(prompt, "Especialista FSA em Saúde Funcional.");
+    const prompt = `Analise os sintomas: ${selectedSymptoms.join(", ")}. Identifique eixos comprometidos.`;
+    const aiResponse = await callGemini(prompt, "Especialista em saúde funcional.");
     if (aiResponse) setAnalysisResult(aiResponse);
     setLoading(false);
   };
 
   return (
     <div className="mt-8">
-      <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-        <ListChecks className="text-[#fb336d]" size={22} /> Triagem de Sintomas Interativa
+      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <ListChecks className="text-[#fb336d]" size={20} /> Triagem de Sintomas
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         {categories.map((cat, idx) => (
-          <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <h4 className="text-[10px] font-black text-[#fb336d] uppercase mb-4 tracking-[0.15em]">{cat.name}</h4>
-            <div className="flex flex-wrap gap-2">
+          <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <h4 className="text-[10px] font-bold text-[#fb336d] uppercase mb-3">{cat.name}</h4>
+            <div className="flex flex-wrap gap-1.5">
               {cat.symptoms.map((s, i) => (
                 <button
                   key={i}
                   onClick={() => setSelectedSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-                  className={`text-[10px] font-bold px-3 py-2 rounded-lg transition-all border ${
-                    selectedSymptoms.includes(s) ? 'bg-[#fb336d]/20 border-[#fb336d] text-white shadow-[0_0_10px_rgba(251,51,109,0.2)]' : 'bg-black/40 border-white/10 text-slate-500 hover:border-white/30'
+                  className={`text-[9px] font-bold px-2 py-1.5 rounded-md transition-all border ${
+                    selectedSymptoms.includes(s) ? 'bg-[#fb336d]/20 border-[#fb336d] text-white' : 'bg-black/40 border-white/10 text-slate-500'
                   }`}
                 >
                   {s}
@@ -233,12 +260,12 @@ const InteractiveQuestionnaire = () => {
       </div>
       <button 
         onClick={handleAnalyze} disabled={loading || selectedSymptoms.length === 0}
-        className="w-full bg-[#fb336d] py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-[#d42a68] transition-all disabled:opacity-50"
+        className="w-full bg-[#fb336d] py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg hover:bg-[#d42a68]"
       >
-        {loading ? <Loader2 className="animate-spin" size={20} /> : <Activity size={20} />} Analisar Quadro Clínico
+        {loading ? <Loader2 className="animate-spin" size={18} /> : <Activity size={18} />} Analisar Quadro Clínico
       </button>
       {analysisResult && (
-        <div className="mt-6 p-6 bg-black/60 rounded-2xl border border-[#fb336d]/30 text-sm leading-relaxed text-slate-200 animate-in zoom-in-95">
+        <div className="mt-4 p-4 bg-black/60 rounded-xl border border-[#fb336d]/30 text-xs leading-relaxed text-slate-200">
           <div dangerouslySetInnerHTML={{ __html: formatPlainText(analysisResult) }} />
         </div>
       )}
@@ -263,28 +290,28 @@ const LoginScreen = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0d0618] font-sans">
-      <div className="w-full max-w-md bg-white/5 border border-white/10 p-10 rounded-[2.5rem] shadow-2xl text-center relative overflow-hidden backdrop-blur-xl">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#fb336d] via-[#d42a68] to-transparent"></div>
-        <div className="w-20 h-20 bg-[#fb336d]/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-[#fb336d]/20">
-          <Lock className="text-[#fb336d]" size={32} />
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0d0618]">
+      <div className="w-full max-w-md bg-white/5 border border-white/10 p-8 rounded-3xl shadow-2xl text-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#fb336d] to-transparent"></div>
+        <div className="w-16 h-16 bg-[#fb336d]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Lock className="text-[#fb336d]" size={28} />
         </div>
-        <h1 className="text-2xl font-black text-white mb-3 tracking-tight">ACESSO RESTRITO</h1>
-        <p className="text-slate-400 text-sm mb-10 font-medium">Insira a palavra-passe de aluno FSA para desbloquear o Manual Clínico Digital.</p>
+        <h1 className="text-2xl font-bold text-white mb-2">Acesso Restrito</h1>
+        <p className="text-slate-400 text-sm mb-8">Introduza a palavra-passe de aluno para aceder ao Manual Clínico Digital.</p>
         
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input 
             type="password" 
             value={pass}
             onChange={(e) => setPass(e.target.value)}
             placeholder="Palavra-passe"
-            className={`w-full bg-black/40 border ${error ? 'border-red-500' : 'border-white/10'} rounded-2xl px-6 py-4 text-center text-white focus:outline-none focus:border-[#fb336d] transition-all text-lg tracking-[0.3em] font-bold`}
+            className={`w-full bg-black/40 border ${error ? 'border-red-500' : 'border-white/10'} rounded-xl px-4 py-3 text-center text-white focus:outline-none focus:border-[#fb336d] transition-all`}
           />
-          <button type="submit" className="w-full bg-[#fb336d] py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#d42a68] transition-all shadow-lg shadow-[#fb336d]/20 flex items-center justify-center gap-3">
-            ACEDER AGORA <Unlock size={18}/>
+          <button type="submit" className="w-full bg-[#fb336d] py-3 rounded-xl font-bold hover:bg-[#d42a68] transition-all shadow-lg shadow-[#fb336d]/20 flex items-center justify-center gap-2">
+            Aceder ao Manual <Unlock size={18}/>
           </button>
         </form>
-        {error && <p className="text-red-500 text-xs mt-6 font-bold animate-pulse tracking-wide">ACESSO NEGADO. VERIFIQUE A SENHA.</p>}
+        {error && <p className="text-red-500 text-xs mt-4 font-bold animate-pulse">Acesso Negado. Tente novamente.</p>}
       </div>
     </div>
   );
@@ -292,13 +319,13 @@ const LoginScreen = ({ onLogin }) => {
 
 // --- MAIN APP ---
 
-function App() {
+export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
 
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
   }, []);
@@ -306,21 +333,20 @@ function App() {
   if (!isAuthenticated) return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
 
   return (
-    <div className="min-h-screen relative flex flex-col text-white pb-20" style={{ background: '#0d0618', fontFamily: "'Montserrat', sans-serif" }}>
-      {/* Glow Effects */}
+    <div className="min-h-screen relative flex flex-col text-white" style={{ background: '#0d0618', fontFamily: "'Montserrat', sans-serif" }}>
+      {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
-        <div className="absolute rounded-full" style={{ top: '-10%', right: '-5%', width: '60vw', height: '60vw', background: 'radial-gradient(circle, rgba(251,51,109,0.15) 0%, transparent 70%)' }} />
-        <div className="absolute rounded-full" style={{ bottom: '5%', left: '-5%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(110,40,200,0.1) 0%, transparent 70%)' }} />
+        <div className="absolute rounded-full" style={{ top: '-200px', right: '-200px', width: '700px', height: '700px', background: 'radial-gradient(circle, rgba(251,51,109,0.3) 0%, transparent 70%)' }} />
+        <div className="absolute rounded-full" style={{ bottom: '60px', left: '-80px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(110,40,200,0.2) 0%, transparent 70%)' }} />
       </div>
       
-      <nav className="relative w-full border-b border-white/5 h-[80px] z-10 flex justify-center backdrop-blur-md bg-[#0d0618]/50 sticky top-0">
+      <nav className="relative w-full border-b border-white/10 h-[72px] z-10 flex justify-center">
         <div className="w-full max-w-6xl px-6 flex justify-between items-center">
-          <img src="https://saudeavancada.com.br/wp-content/uploads/2026/03/creme-e-rosa.png" alt="Logo FSA" className="h-10 w-auto opacity-90" />
-          <div className="text-[10px] font-black text-slate-500 tracking-widest border border-white/10 px-3 py-1.5 rounded-full">v2.5 ALPHA</div>
+          <img src="https://saudeavancada.com.br/wp-content/uploads/2026/03/creme-e-rosa.png" alt="Logo FSA" className="h-10 w-auto object-contain" />
         </div>
       </nav>
 
-      <main className="relative flex-grow flex flex-col w-full max-w-6xl mx-auto z-10 px-6 py-12">
+      <main className="relative flex-grow flex flex-col w-full max-w-6xl mx-auto z-10 px-6 py-8">
         {activeModule ? (
           <DetailView 
             moduleData={modulesData.find(m => m.id === activeModule)} 
@@ -328,12 +354,10 @@ function App() {
           />
         ) : (
           <div>
-            <header className="mb-14">
-              <h1 className="text-5xl font-black text-white mb-3 tracking-tight">Manual Clínico Digital</h1>
-              <div className="flex items-center gap-4">
-                <div className="h-1 w-20 bg-[#fb336d]"></div>
-                <h2 className="text-xl font-bold text-slate-400">Medicina e Saúde Hormonal</h2>
-              </div>
+            <header className="mb-10">
+              <h1 className="text-4xl font-extrabold text-white mb-2">Manual Clínico de Sintomas</h1>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-[#fb336d] to-[#d42a68] bg-clip-text text-transparent mb-4">Saúde Hormonal</h2>
+              <p className="text-slate-400 max-w-2xl leading-relaxed font-medium">Guia clínico interativo potencializado por IA para apoio à decisão clínica e investigação hormonal avançada.</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -342,18 +366,17 @@ function App() {
                 return (
                   <div 
                     key={m.id} onClick={() => setActiveModule(m.id)}
-                    className="group cursor-pointer p-8 rounded-[2rem] bg-white/5 border border-white/10 hover:border-[#fb336d]/40 hover:bg-white/10 transition-all duration-500 flex flex-col h-full shadow-lg relative overflow-hidden"
+                    className="group cursor-pointer p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-[#fb336d]/50 hover:bg-white/10 transition-all duration-300 flex flex-col h-full shadow-lg"
                   >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#fb336d]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="w-14 h-14 rounded-2xl bg-[#fb336d] flex items-center justify-center mb-6 shadow-xl shadow-[#fb336d]/30 group-hover:scale-110 transition-transform">
-                      <Icon size={24} color="white" strokeWidth={2.5} />
+                    <div className="w-10 h-10 rounded-xl bg-[#fb336d] flex items-center justify-center mb-4 shadow-lg shadow-[#fb336d]/20 shrink-0">
+                      <Icon size={20} color="white" />
                     </div>
                     <div className="flex-grow">
-                      <h3 className="text-xl font-black text-white mb-3 group-hover:text-[#fb336d] transition-colors tracking-tight">{m.title}</h3>
-                      <p className="text-sm text-slate-400 leading-relaxed font-medium">{m.description}</p>
+                      <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#fb336d] transition-colors">{m.title}</h3>
+                      <p className="text-sm text-slate-400 line-clamp-2 font-medium">{m.description}</p>
                     </div>
-                    <div className="mt-8 flex items-center gap-2 text-[10px] font-black text-[#fb336d] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
-                      Explorar módulo <ChevronRight size={14} />
+                    <div className="mt-6 flex justify-end">
+                      <ChevronRight size={18} className="text-slate-600 group-hover:text-[#fb336d] transform group-hover:translate-x-1 transition-all" />
                     </div>
                   </div>
                 );
@@ -370,28 +393,25 @@ function DetailView({ moduleData, onBack }) {
   const content = moduleData.topics[0].content;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-      <button onClick={onBack} className="group flex items-center gap-3 text-slate-500 hover:text-white mb-10 transition-all text-xs font-black uppercase tracking-widest">
-        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> Voltar ao Painel
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-[#fb336d] mb-8 transition-colors text-sm font-semibold">
+        <ArrowLeft size={16} /> Voltar ao Painel
       </button>
 
-      <div className="bg-gradient-to-br from-white/10 to-transparent border border-white/10 rounded-[2.5rem] p-10 mb-10 shadow-2xl backdrop-blur-md">
-        <span className="text-[10px] font-black text-[#fb336d] uppercase tracking-[0.3em] mb-4 block">{moduleData.topics[0].title}</span>
-        <h2 className="text-4xl font-black text-white mb-6 tracking-tight">{moduleData.title}</h2>
-        <div className="h-1 w-full bg-white/5 relative">
-            <div className="absolute h-full w-1/4 bg-[#fb336d]"></div>
-        </div>
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 mb-8 shadow-xl">
+        <h2 className="text-3xl font-bold text-white mb-1">{moduleData.title}</h2>
+        <span className="text-xs font-bold text-[#fb336d] uppercase tracking-widest">{moduleData.topics[0].title}</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        <ContentCard icon={FileText} title="Introdução" text={content.intro} />
-        <ContentCard icon={Activity} title="Explicação Clínica" text={content.explanation} />
-        <ContentCard icon={Target} title="Aplicação Prática" text={content.application} />
-        <ContentCard icon={CheckCircle2} title="Resumo FSA" text={content.summary} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <ContentCard icon={FileText} title="Contexto" text={content.intro} />
+        <ContentCard icon={Activity} title="Análise" text={content.explanation} />
+        <ContentCard icon={Target} title="Aplicação" text={content.application} />
+        <ContentCard icon={CheckCircle2} title="Conclusão" text={content.summary} />
       </div>
 
-      <div className="border-t border-white/10 pt-10">
-        {(moduleData.id !== 'questionario' && moduleData.id !== 'fluxogramas' && moduleData.id !== 'ciclo_menstrual') && (
+      <div className="border-t border-white/10 pt-8">
+        {(moduleData.id.includes('anamnese') || moduleData.id.includes('matriz') || moduleData.id.includes('exames')) && (
           <GeminiAssistant type={moduleData.id} />
         )}
         {moduleData.id === 'questionario' && <InteractiveQuestionnaire />}
@@ -402,17 +422,16 @@ function DetailView({ moduleData, onBack }) {
 
 function ContentCard({ icon: Icon, title, text }) {
   return (
-    <div className="bg-white/5 border border-white/5 p-8 rounded-[2rem] hover:bg-white/[0.08] transition-all hover:border-white/20 group">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-[#fb336d]/20 transition-colors">
-            <Icon size={16} className="text-[#fb336d]" />
-        </div>
-        <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{title}</h4>
+    <div className="bg-white/5 border border-white/5 p-5 rounded-xl hover:bg-white/10 transition-colors">
+      <div className="flex items-center gap-2 mb-3">
+        <Icon size={18} className="text-[#fb336d]" />
+        <h4 className="text-[10px] font-bold uppercase text-slate-500 tracking-widest">{title}</h4>
       </div>
-      <p className="text-slate-300 text-[15px] leading-relaxed font-medium">{text}</p>
+      <p className="text-slate-200 text-sm leading-relaxed font-medium">{text}</p>
     </div>
   );
 }
+  
 
 // --- RENDERIZAÇÃO FINAL (O QUE FALTAVA) ---
 const root = ReactDOM.createRoot(document.getElementById('root'));
