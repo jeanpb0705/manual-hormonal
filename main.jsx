@@ -51,14 +51,32 @@ async function callGemini(prompt, systemInstruction = "") {
   try {
     let delay = 1000;
     for (let i = 0; i < 5; i++) {
-      const response = await fetch(https://www.google.com/search?q=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent%3Fkey%3D${apiKey}, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
-        })
-      });
+      confor (let i = 0; i < 5; i++) {
+  // O link deve começar direto com https://generativelanguage...
+  // Use ` (crase) para que o ${apiKey} funcione corretamente
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json' 
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+    })
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text;
+  }
+  
+  // Se der erro 429 (muitas requisições), ele espera um pouco e tenta de novo
+  if (response.status === 429 || response.status >= 500) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  } else {
+    break; 
+  }
+}
 
       if (response.ok) {
         const data = await response.json();
