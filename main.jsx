@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO DE SEGURANÇA ---
-const ACCESS_PASSWORD = "SAUDEAVANCADA"; 
+const ACCESS_PASSWORD = ""; 
 
 // --- CONFIGURAÇÃO API ---
 const getApiKey = () => {
