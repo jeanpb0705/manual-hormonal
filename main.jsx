@@ -35,7 +35,7 @@ const getApiKey = () => {
       return process.env.VITE_GEMINI_API_KEY;
     }
   } catch (e) {
-    console.warn("Ambiente não suporta acesso direto a variáveis de meta.");
+    return "";
   }
   return ""; 
 };
@@ -46,34 +46,24 @@ async function callGemini(prompt, systemInstruction = "") {
   if (!apiKey) return "Erro: Chave de API não detectada. Verifique as Environment Variables na Vercel.";
   
   try {
-    // Loop de tentativa para evitar erros temporários da API
-    for (let i = 0; i < 3; i++) {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
-        })
-      });
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+      })
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text;
-      }
-
-      if (response.status === 429 || response.status >= 500) {
-        // Espera 2 segundos antes de tentar novamente se a API estiver ocupada
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } else {
-        const errorData = await response.json();
-        return `Erro na IA (${response.status}): ${errorData.error?.message || "Falha na comunicação"}`;
-      }
+    if (response.ok) {
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text;
+    } else {
+      const errorData = await response.json();
+      return `Erro (${response.status}): ${errorData.error?.message || "Falha na API"}`;
     }
-    return "Não foi possível obter resposta da IA após várias tentativas.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Erro de conexão com o servidor da Inteligência Artificial.";
+    return "Erro de conexão com a IA. Verifique sua rede.";
   }
 }
 
@@ -169,9 +159,9 @@ const GeminiAssistant = ({ type }) => {
     let system = "És um assistente médico especialista em endocrinologia funcional.";
 
     if (type.includes('anamnese')) {
-      prompt = `Com base no relato: "${userInput}". Sugere 5 perguntas clínicas profundas. Texto simples, sem markdown.`;
+      prompt = `Com base no relato: "${userInput}". Sugere 5 perguntas clínicas profundas. Texto simples.`;
     } else if (type.includes('exames')) {
-      prompt = `Analisa os valores: "${userInput}". Interpreta com base em SAÚDE FUNCIONAL (valores ótimos). Texto simples.`;
+      prompt = `Analisa os valores: "${userInput}". Interpreta com base em SAÚDE FUNCIONAL. Texto simples.`;
     } else {
       prompt = `Sintomas: "${userInput}". Sugere 3 hipóteses e exames. Texto simples.`;
     }
@@ -272,7 +262,6 @@ const InteractiveQuestionnaire = () => {
 };
 
 // --- TELA DE LOGIN ---
-
 const LoginScreen = ({ onLogin }) => {
   const [pass, setPass] = useState("");
   const [error, setError] = useState(false);
@@ -296,7 +285,6 @@ const LoginScreen = ({ onLogin }) => {
         </div>
         <h1 className="text-2xl font-bold text-white mb-2">Acesso Restrito</h1>
         <p className="text-slate-400 text-sm mb-8">Introduza a palavra-passe de aluno para aceder ao Manual Clínico Digital.</p>
-        
         <form onSubmit={handleSubmit} className="space-y-4">
           <input 
             type="password" 
@@ -316,7 +304,6 @@ const LoginScreen = ({ onLogin }) => {
 };
 
 // --- MAIN APP ---
-
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
@@ -332,7 +319,6 @@ function App() {
 
   return (
     <div className="min-h-screen relative flex flex-col text-white" style={{ background: '#0d0618', fontFamily: "'Montserrat', sans-serif" }}>
-      {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
         <div className="absolute rounded-full" style={{ top: '-200px', right: '-200px', width: '700px', height: '700px', background: 'radial-gradient(circle, rgba(251,51,109,0.3) 0%, transparent 70%)' }} />
         <div className="absolute rounded-full" style={{ bottom: '60px', left: '-80px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(110,40,200,0.2) 0%, transparent 70%)' }} />
@@ -430,7 +416,7 @@ function ContentCard({ icon: Icon, title, text }) {
   );
 }
 
-// --- RENDERIZAÇÃO FINAL ---
+// --- RENDERIZAÇÃO ---
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
