@@ -43,34 +43,37 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  // Pega a chave que você já tem na Vercel
   const key = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!key) return "Erro: Configure VITE_GEMINI_API_KEY na Vercel.";
+  if (!key) return "Chave não configurada.";
 
-  try {
-    // Usaremos a URL mais estável que existe
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ 
-          parts: [{ text: `${systemInstruction}\n\nAnalise isso: ${prompt}` }] 
-        }]
-      })
-    });
+  const textToSend = `${systemInstruction}\n\n${prompt}`;
+  
+  // Tentaremos o v1beta primeiro, se falhar, tentamos o modelo estável antigo
+  const urls = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${key}`
+  ];
 
-    const data = await response.json();
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: textToSend }] }] })
+      });
 
-    if (response.ok) {
-      return data.candidates[0].content.parts[0].text;
-    } else {
-      // Se der erro, ele vai te dizer exatamente o que é (ex: se a chave está errada)
-      return `Erro no Google: ${data.error?.message || "Verifique sua chave"}`;
+      if (response.ok) {
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+      }
+    } catch (e) {
+      continue;
     }
-  } catch (error) {
-    return "Erro de conexão. Verifique sua internet.";
   }
+
+  return "O Google está recusando a conexão. Tente criar uma chave em 'Default Gemini Project' no AI Studio.";
 }
+
 // --- ESTRUTURA DE DADOS ---
 const modulesData = [
   {
