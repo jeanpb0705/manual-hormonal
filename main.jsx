@@ -43,15 +43,21 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  if (!apiKey) return "Erro: Chave de API não detectada. Verifique as Environment Variables na Vercel.";
+  if (!apiKey) return "Erro: Chave de API não detectada.";
   
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    // Combinamos a instrução de sistema diretamente no texto para evitar erro de campo
+    const fullPrompt = systemInstruction 
+      ? `Instrução: ${systemInstruction}\n\nPergunta: ${prompt}`
+      : prompt;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+        contents: [{ 
+          parts: [{ text: fullPrompt }] 
+        }]
       })
     });
 
@@ -60,10 +66,11 @@ async function callGemini(prompt, systemInstruction = "") {
       return data.candidates?.[0]?.content?.parts?.[0]?.text;
     } else {
       const errorData = await response.json();
-      return `Erro (${response.status}): ${errorData.error?.message || "Falha na API"}`;
+      console.error("Erro detalhado:", errorData);
+      return `Erro na IA: ${errorData.error?.message || "Falha na comunicação"}`;
     }
   } catch (error) {
-    return "Erro de conexão com a IA. Verifique sua rede.";
+    return "Erro de conexão com a IA.";
   }
 }
 
