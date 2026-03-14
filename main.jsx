@@ -44,34 +44,33 @@ const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
   const key = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!key) return "Chave não configurada.";
+  if (!key) return "Chave ausente na Vercel.";
 
-  const textToSend = `${systemInstruction}\n\n${prompt}`;
-  
-  // Tentaremos o v1beta primeiro, se falhar, tentamos o modelo estável antigo
-  const urls = [
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${key}`
-  ];
+  try {
+    // Passo 1: Descobrir qual modelo a sua conta permite
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    const listData = await listRes.json();
+    
+    // Pegamos o primeiro modelo da sua lista que aceita gerar conteúdo
+    const availableModel = listData.models?.find(m => m.supportedGenerationMethods.includes("generateContent"))?.name;
 
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: textToSend }] }] })
-      });
+    if (!availableModel) return "O Google diz que sua chave não tem modelos liberados ainda.";
 
-      if (response.ok) {
-        const data = await response.json();
-        return data.candidates[0].content.parts[0].text;
-      }
-    } catch (e) {
-      continue;
-    }
+    // Passo 2: Fazer a chamada com o modelo que o próprio Google nos deu
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${availableModel}:generateContent?key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${systemInstruction}\n\n${prompt}` }] }]
+      })
+    });
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Resposta vazia do Google.";
+
+  } catch (error) {
+    return "Erro crítico de conexão. Verifique se sua chave API está ativa.";
   }
-
-  return "O Google está recusando a conexão. Tente criar uma chave em 'Default Gemini Project' no AI Studio.";
 }
 
 // --- ESTRUTURA DE DADOS ---
