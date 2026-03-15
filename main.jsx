@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO DE SEGURANÇA ---
-const ACCESS_PASSWORD = ""; 
+const ACCESS_PASSWORD = "SAUDEHORMONALFSA"; 
 
 // --- CONFIGURAÇÃO API ---
 const getApiKey = () => {
