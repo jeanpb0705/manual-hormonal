@@ -43,33 +43,26 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 async function callGemini(prompt, systemInstruction = "") {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!key) return "Chave ausente na Vercel.";
 
   try {
-    // Passo 1: Descobrir qual modelo a sua conta permite
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-    const listData = await listRes.json();
-    
-    // Pegamos o primeiro modelo da sua lista que aceita gerar conteúdo
-    const availableModel = listData.models?.find(m => m.supportedGenerationMethods.includes("generateContent"))?.name;
 
-    if (!availableModel) return "O Google diz que sua chave não tem modelos liberados ainda.";
-
-    // Passo 2: Fazer a chamada com o modelo que o próprio Google nos deu
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${availableModel}:generateContent?key=${key}`, {
+    const response = await fetch("/api/gemini", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemInstruction}\n\n${prompt}` }] }]
+        prompt,
+        systemInstruction
       })
     });
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Resposta vazia do Google.";
+
+    return data.text || "Resposta vazia.";
 
   } catch (error) {
-    return "Erro crítico de conexão. Verifique se sua chave API está ativa.";
+    return "Erro ao contactar a IA.";
   }
 }
 
