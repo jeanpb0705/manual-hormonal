@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO DE SEGURANÇA ---
-const ACCESS_PASSWORD = ""; 
+const ACCESS_PASSWORD = "SAUDEHORMONAL"; 
 
 // --- COMPONENTE DE ANAMNESE ESTRATÉGICA ---
 const AnamneseStrategyView = () => {
