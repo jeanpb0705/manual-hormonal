@@ -2215,8 +2215,8 @@ function App() {
         ) : (
           <div>
             <header className="mb-10">
-              <h1 className="text-4xl font-extrabold text-white mb-2">Manual Clínico de Sintomas</h1>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-[#fb336d] to-[#d42a68] bg-clip-text text-transparent mb-4">Saúde Hormonal</h2>
+              <h1 className="text-4xl font-extrabold text-white mb-2">Guia Hormonal</h1>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-[#fb336d] to-[#d42a68] bg-clip-text text-transparent mb-4">Do sintoma ao protocolo, com raciocínio clínico estruturado</h2>
               <p className="text-slate-400 max-w-2xl leading-relaxed font-medium">Guia clínico interativo para apoio à decisão clínica e investigação hormonal avançada.</p>
             </header>
 
